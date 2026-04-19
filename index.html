@@ -317,36 +317,36 @@
     background: var(--pastel-lightest);
     border: 1.5px solid var(--pastel-green);
   }
-  .sel-day-title { font-weight: 700; color: var(--emerald); margin-bottom: 10px; font-size: 15px; }
-  .sel-day-tasks { display: flex; flex-direction: column; gap: 7px; max-height: 120px; overflow-y: auto; }
-  .sel-add-row {
-    display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px;
+  .sel-day-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .sel-day-title { font-weight: 700; color: var(--emerald); font-size: 15px; }
+  .sel-day-badge {
+    font-size: 11px; font-weight: 600; padding: 3px 10px;
+    border-radius: 50px; background: var(--pastel-green); color: var(--emerald);
   }
+  .sel-add-row { display: flex; gap: 8px; margin-bottom: 12px; }
   .sel-add-row input {
     flex: 1; min-width: 0; padding: 9px 14px;
-    border: 1.5px solid var(--pastel-green);
-    border-radius: 50px;
-    background: #fff;
-    font-family: 'DM Sans', sans-serif; font-size: 13px;
-    color: var(--text); outline: none;
-    transition: border-color 0.2s, box-shadow 0.2s;
+    border: 1.5px solid var(--pastel-green); border-radius: 50px;
+    background: #fff; font-family: 'DM Sans', sans-serif; font-size: 13px;
+    color: var(--text); outline: none; transition: border-color 0.2s;
   }
-  .sel-add-row input:focus {
-    border-color: var(--emerald-bright);
-    box-shadow: 0 0 0 3px rgba(58,175,122,0.15);
-  }
+  .sel-add-row input:focus { border-color: var(--emerald-bright); }
   .sel-add-row input::placeholder { color: var(--muted); }
-  .btn-sel-add {
+  .sel-cat-select {
+    padding: 9px 10px; border: 1.5px solid var(--pastel-green); border-radius: 50px;
+    background: #fff; font-family: 'DM Sans', sans-serif; font-size: 12px;
+    color: var(--text); outline: none; cursor: pointer;
+  }
+  .sel-add-btn {
     padding: 9px 16px; border-radius: 50px;
     background: linear-gradient(135deg, var(--emerald-bright), var(--emerald));
     color: #fff; border: none; cursor: pointer;
     font-family: 'DM Sans', sans-serif; font-weight: 600; font-size: 13px;
-    box-shadow: 0 3px 10px rgba(26,107,74,0.3);
-    transition: transform 0.15s, box-shadow 0.15s; white-space: nowrap;
+    box-shadow: 0 3px 10px rgba(26,107,74,0.3); transition: transform 0.15s;
+    white-space: nowrap;
   }
-  .btn-sel-add:hover { transform: scale(1.04); }
-  .btn-sel-add:active { transform: scale(0.97); }
-
+  .sel-add-btn:hover { transform: scale(1.04); }
+  .sel-day-tasks { display: flex; flex-direction: column; gap: 7px; max-height: 140px; overflow-y: auto; }
   .sel-task-chip {
     display: flex; align-items: center; gap: 8px;
     font-size: 13px; font-weight: 500;
@@ -354,6 +354,12 @@
     background: #fff; border: 1px solid var(--pastel-green);
   }
   .sel-task-chip.done-chip { opacity: 0.65; text-decoration: line-through; }
+  .sel-task-del {
+    margin-left: auto; background: none; border: none; cursor: pointer;
+    color: var(--muted); font-size: 15px; line-height: 1; padding: 0 2px;
+    transition: color 0.2s;
+  }
+  .sel-task-del:hover { color: #c0392b; }
   .empty-msg { font-size: 13px; color: var(--muted); font-style: italic; }
 
   /* ── Analytics ── */
@@ -489,19 +495,22 @@
     </div>
     <div class="cal-grid" id="cal-grid"></div>
     <div class="selected-day-info" id="selected-day-info">
-      <div class="sel-day-title" id="sel-day-title">Select a day to see tasks</div>
+      <div class="sel-day-header">
+        <div class="sel-day-title" id="sel-day-title">Select a day to plan tasks</div>
+        <div class="sel-day-badge" id="sel-day-badge"></div>
+      </div>
       <div class="sel-add-row">
-        <input type="text" id="sel-task-input" placeholder="Add task to this day…" maxlength="60">
-        <select class="category-select" id="sel-task-cat" style="font-size:12px;padding:8px 10px;">
+        <input type="text" id="sel-task-input" placeholder="Add task for this day…" maxlength="60">
+        <select class="sel-cat-select" id="sel-task-cat">
           <option value="study">📚 Study</option>
           <option value="health">💪 Health</option>
           <option value="hobby">🎨 Hobby</option>
           <option value="personal">💜 Personal</option>
           <option value="other">✦ Other</option>
         </select>
-        <button class="btn-sel-add" onclick="addTaskToSelected()">+ Add</button>
+        <button class="sel-add-btn" onclick="addTaskToSelDay()">+ Add</button>
       </div>
-      <div class="sel-day-tasks" id="sel-day-tasks"><p class="empty-msg">No tasks recorded for this day.</p></div>
+      <div class="sel-day-tasks" id="sel-day-tasks"><p class="empty-msg">No tasks on this day.</p></div>
     </div>
   </div>
 
@@ -678,18 +687,47 @@ function renderCalendar() {
 function selectDay(key, d) {
   selKey = key; renderCalendar();
 }
+function addTaskToSelDay() {
+  const inp  = document.getElementById('sel-task-input');
+  const cat  = document.getElementById('sel-task-cat').value;
+  const text = inp.value.trim();
+  if (!text) { inp.focus(); return; }
+  const day = getDay(selKey);
+  day.tasks.push({ id: Date.now(), text, cat, done: false });
+  saveState(); inp.value = '';
+  renderCalendar(); renderAnalytics();
+  // also refresh today's checklist if selected day is today
+  if (selKey === todayKey) renderChecklist();
+  showToast('Task planned ✦');
+}
+document.getElementById('sel-task-input').addEventListener('keydown', e => { if (e.key==='Enter') addTaskToSelDay(); });
+
+function deleteSelTask(key, id) {
+  const day = getDay(key);
+  day.tasks = day.tasks.filter(t => t.id !== id);
+  saveState(); renderCalendar(); renderAnalytics();
+  if (key === todayKey) renderChecklist();
+}
 function renderSelDay() {
   const months=['January','February','March','April','May','June','July','August','September','October','November','December'];
   const [y,m,d] = selKey.split('-').map(Number);
+  const isToday = selKey === todayKey;
+  const isPast  = selKey < todayKey;
   document.getElementById('sel-day-title').textContent = `${d} ${months[m-1]} ${y}`;
+  const badge = document.getElementById('sel-day-badge');
+  badge.textContent = isToday ? 'Today' : isPast ? 'Past' : 'Upcoming';
+  badge.style.background = isToday ? 'linear-gradient(135deg,var(--emerald-bright),var(--emerald))' : '';
+  badge.style.color = isToday ? '#fff' : '';
+
   const tasks = state[selKey]?.tasks || [];
   const wrap  = document.getElementById('sel-day-tasks');
-  if (!tasks.length) { wrap.innerHTML = '<p class="empty-msg">No tasks on this day.</p>'; return; }
+  if (!tasks.length) { wrap.innerHTML = '<p class="empty-msg">No tasks — add one above 🌿</p>'; return; }
   wrap.innerHTML = tasks.map(t => {
     const m2 = CAT_META[t.cat]||CAT_META.other;
     return `<div class="sel-task-chip ${t.done?'done-chip':''}">
       <span class="task-cat-badge ${m2.cls}" style="font-size:10px">${m2.label}</span>
-      ${escHtml(t.text)}
+      <span>${escHtml(t.text)}</span>
+      <button class="sel-task-del" onclick="deleteSelTask('${selKey}',${t.id})" title="Delete">×</button>
     </div>`;
   }).join('');
 }
